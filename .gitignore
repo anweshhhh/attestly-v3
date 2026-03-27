@@ -1,0 +1,8 @@
+node_modules
+.next
+.blob-mock
+.env
+.env.local
+.DS_Store
+coverage
+*.tsbuildinfo

@@ -1,0 +1,215 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_DATABASE_URL")
+}
+
+enum WorkspaceRole {
+  OWNER
+  ADMIN
+  REVIEWER
+  VIEWER
+}
+
+enum DocumentStatus {
+  UPLOADED
+  PROCESSING
+  READY
+  ERROR
+}
+
+enum QuestionReviewStatus {
+  DRAFT
+  NEEDS_REVIEW
+  APPROVED
+}
+
+enum ReuseMatchType {
+  EXACT
+  NEAR_EXACT
+  SEMANTIC
+}
+
+enum AutofillRunStatus {
+  IDLE
+  RUNNING
+  COMPLETED
+  ERROR
+}
+
+model User {
+  id                  String       @id @default(cuid())
+  email               String       @unique
+  name                String?
+  createdAt           DateTime     @default(now())
+  updatedAt           DateTime     @updatedAt
+  lastUsedWorkspaceId String?
+  lastUsedWorkspace   Workspace?   @relation("UserLastUsedWorkspace", fields: [lastUsedWorkspaceId], references: [id], onDelete: SetNull)
+  memberships         Membership[]
+  questionnaires      Questionnaire[] @relation("QuestionnaireCreatedBy")
+  exportRecords       ExportRecord[]  @relation("ExportRecordCreatedBy")
+}
+
+model Workspace {
+  id                 String            @id @default(cuid())
+  name               String
+  slug               String            @unique
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime          @updatedAt
+  memberships        Membership[]
+  evidenceDocuments  EvidenceDocument[]
+  questionnaires     Questionnaire[]
+  approvedAnswers    ApprovedAnswer[]
+  lastUsedByUsers    User[]            @relation("UserLastUsedWorkspace")
+}
+
+model Membership {
+  id          String        @id @default(cuid())
+  workspaceId String
+  userId      String
+  role        WorkspaceRole
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  workspace   Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  user        User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceId, userId])
+  @@index([userId])
+}
+
+model EvidenceDocument {
+  id                  String         @id @default(cuid())
+  workspaceId         String
+  workspace           Workspace      @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  name                String
+  originalName        String
+  mimeType            String
+  storagePath         String
+  byteSize            Int
+  status              DocumentStatus @default(UPLOADED)
+  uploadedByUserId    String
+  errorMessage        String?
+  evidenceFingerprint String?
+  chunkCount          Int            @default(0)
+  archivedAt          DateTime?
+  createdAt           DateTime       @default(now())
+  updatedAt           DateTime       @updatedAt
+  chunks              EvidenceChunk[]
+
+  @@index([workspaceId, createdAt])
+  @@index([workspaceId, status])
+}
+
+model EvidenceChunk {
+  id                  String                   @id @default(cuid())
+  documentId          String
+  document            EvidenceDocument         @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  chunkIndex          Int
+  content             String
+  evidenceFingerprint String
+  embedding           Unsupported("vector(1536)")?
+  createdAt           DateTime                 @default(now())
+  approvedEvidence    ApprovedAnswerEvidence[]
+
+  @@unique([documentId, chunkIndex])
+  @@index([documentId])
+}
+
+model Questionnaire {
+  id                 String             @id @default(cuid())
+  workspaceId        String
+  workspace          Workspace          @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  name               String
+  sourceFileName     String
+  questionColumn     String
+  originalHeaders    String[]
+  totalCount         Int                @default(0)
+  answeredCount      Int                @default(0)
+  approvedCount      Int                @default(0)
+  needsReviewCount   Int                @default(0)
+  autofillStatus     AutofillRunStatus  @default(IDLE)
+  autofillCursor     Int                @default(0)
+  autofillError      String?
+  lastAutofilledAt   DateTime?
+  createdByUserId    String
+  createdByUser      User               @relation("QuestionnaireCreatedBy", fields: [createdByUserId], references: [id], onDelete: Cascade)
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+  items              QuestionnaireItem[]
+  exportRecords      ExportRecord[]
+
+  @@index([workspaceId, createdAt])
+}
+
+model QuestionnaireItem {
+  id                         String               @id @default(cuid())
+  questionnaireId            String
+  questionnaire              Questionnaire        @relation(fields: [questionnaireId], references: [id], onDelete: Cascade)
+  rowIndex                   Int
+  sourceRow                  Json
+  text                       String
+  answer                     String?
+  citations                  Json
+  reviewStatus               QuestionReviewStatus @default(DRAFT)
+  draftSuggestionApplied     Boolean              @default(false)
+  reusedFromApprovedAnswerId String?
+  reuseMatchType             ReuseMatchType?
+  reusedAt                   DateTime?
+  notFoundReason             String?
+  createdAt                  DateTime             @default(now())
+  updatedAt                  DateTime             @updatedAt
+
+  @@unique([questionnaireId, rowIndex])
+  @@index([questionnaireId, reviewStatus])
+}
+
+model ApprovedAnswer {
+  id                     String                   @id @default(cuid())
+  workspaceId            String
+  workspace              Workspace                @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  sourceQuestionId       String                   @unique
+  questionText           String
+  normalizedQuestionText String                   @default("")
+  questionTextHash       String                   @default("")
+  questionEmbedding      Unsupported("vector(1536)")?
+  answerText             String
+  citationChunkIds       String[]
+  createdByUserId        String
+  createdAt              DateTime                 @default(now())
+  updatedAt              DateTime                 @updatedAt
+  evidenceSnapshots      ApprovedAnswerEvidence[]
+
+  @@index([workspaceId, questionTextHash])
+  @@index([workspaceId, normalizedQuestionText])
+}
+
+model ApprovedAnswerEvidence {
+  id                    String         @id @default(cuid())
+  approvedAnswerId      String
+  approvedAnswer        ApprovedAnswer @relation(fields: [approvedAnswerId], references: [id], onDelete: Cascade)
+  chunkId               String
+  chunk                 EvidenceChunk  @relation(fields: [chunkId], references: [id], onDelete: Cascade)
+  fingerprintAtApproval String
+  createdAt             DateTime       @default(now())
+
+  @@unique([approvedAnswerId, chunkId])
+  @@index([approvedAnswerId])
+  @@index([chunkId])
+}
+
+model ExportRecord {
+  id              String        @id @default(cuid())
+  questionnaireId String
+  questionnaire   Questionnaire @relation(fields: [questionnaireId], references: [id], onDelete: Cascade)
+  format          String
+  fileName        String
+  createdByUserId String
+  createdByUser   User          @relation("ExportRecordCreatedBy", fields: [createdByUserId], references: [id], onDelete: Cascade)
+  createdAt       DateTime      @default(now())
+
+  @@index([questionnaireId, createdAt])
+}

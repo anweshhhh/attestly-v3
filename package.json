@@ -1,0 +1,40 @@
+{
+  "name": "attestly-v3",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "build:vercel": "prisma migrate deploy && next build",
+    "start": "next start",
+    "lint": "next lint",
+    "test": "vitest run",
+    "postinstall": "prisma generate",
+    "prisma:generate": "prisma generate",
+    "db:push": "prisma db push",
+    "db:migrate:deploy": "prisma migrate deploy"
+  },
+  "dependencies": {
+    "@prisma/client": "^5.19.1",
+    "@vercel/blob": "^2.3.1",
+    "clsx": "^2.1.1",
+    "next": "^14.2.30",
+    "next-auth": "^4.24.13",
+    "papaparse": "^5.5.3",
+    "pdf-parse": "^1.1.1",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "zod": "^3.24.2"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.5",
+    "@types/papaparse": "^5.5.2",
+    "@types/react": "^18.3.18",
+    "@types/react-dom": "^18.3.5",
+    "eslint": "^8.57.1",
+    "eslint-config-next": "^14.2.30",
+    "prisma": "^5.19.1",
+    "typescript": "^5.7.2",
+    "vitest": "^2.1.8"
+  }
+}
