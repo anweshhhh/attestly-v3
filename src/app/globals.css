@@ -106,6 +106,13 @@ textarea {
   line-height: 1.7;
 }
 
+.auth-error {
+  max-width: 56ch;
+  color: var(--coral-strong);
+  font-size: 0.96rem;
+  line-height: 1.6;
+}
+
 .hero-panel,
 .auth-card {
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.04));

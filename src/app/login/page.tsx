@@ -1,14 +1,37 @@
 export const dynamic = "force-dynamic";
 
-import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
+import { GoogleSignInButton } from "@/components/google-sign-in-button";
 
-export default async function LoginPage() {
+type LoginPageProps = {
+  searchParams?: {
+    callbackUrl?: string | string[];
+    error?: string | string[];
+  };
+};
+
+function getQueryValue(value: string | string[] | undefined): string | null {
+  if (typeof value === "string" && value.trim()) {
+    return value;
+  }
+
+  if (Array.isArray(value)) {
+    const firstValue = value.find((entry) => entry.trim());
+    return firstValue ?? null;
+  }
+
+  return null;
+}
+
+export default async function LoginPage({ searchParams }: LoginPageProps) {
   const currentUser = await getCurrentUser();
   if (currentUser) {
     redirect(`/w/${currentUser.access.workspace.slug}`);
   }
+
+  const callbackUrl = getQueryValue(searchParams?.callbackUrl) ?? "/";
+  const error = getQueryValue(searchParams?.error);
 
   return (
     <main className="auth-shell">
@@ -22,10 +45,14 @@ export default async function LoginPage() {
           </p>
         </div>
         <div className="auth-card">
-          <Link className="button-primary" href="/api/auth/signin/google">
-            Continue with Google
-          </Link>
+          <GoogleSignInButton callbackUrl={callbackUrl} />
           <p className="auth-note">Google account email must be verified. The first user becomes the workspace owner.</p>
+          {error ? (
+            <p className="auth-error">
+              Google sign-in could not start. If this keeps happening after redeploy, recheck the Google callback URI and
+              Vercel auth environment variables.
+            </p>
+          ) : null}
         </div>
       </section>
     </main>
